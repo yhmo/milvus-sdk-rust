@@ -528,6 +528,7 @@ impl ListCollectionsResponse {
         &self.collections
     }
 
+    #[allow(deprecated)]
     pub(crate) fn from_proto(value: milvus::ShowCollectionsResponse) -> Result<Self> {
         let count = value.collection_names.len();
         validate_parallel_array_len(
@@ -565,6 +566,13 @@ impl ListCollectionsResponse {
             "shards_num",
             value.shards_num.len(),
         )?;
+        validate_optional_parallel_array_len(
+            "ShowCollectionsResponse",
+            "collection_names",
+            count,
+            "in_memory_percentages",
+            value.in_memory_percentages.len(),
+        )?;
 
         let names = value.collection_names;
         let collections = names
@@ -577,6 +585,7 @@ impl ListCollectionsResponse {
                 created_utc_timestamp: value.created_utc_timestamps[i],
                 query_service_available: value.query_service_available.get(i).copied(),
                 shard_count: value.shards_num.get(i).copied(),
+                memory_percentage: value.in_memory_percentages.get(i).copied(),
             })
             .collect();
         Ok(Self {
@@ -945,6 +954,40 @@ mod tests {
             None
         );
         assert_eq!(response.collections()[0].get_shard_count(), None);
+        assert_eq!(response.collections()[0].get_memory_percentage(), None);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn list_collections_decodes_in_memory_percentages() {
+        let response = ListCollectionsResponse::from_proto(milvus::ShowCollectionsResponse {
+            collection_names: vec!["books".into()],
+            collection_ids: vec![1],
+            created_timestamps: vec![10],
+            created_utc_timestamps: vec![100],
+            query_service_available: vec![true],
+            shards_num: vec![2],
+            in_memory_percentages: vec![100],
+            ..Default::default()
+        })
+        .expect("full metadata decodes");
+
+        let info = &response.collections()[0];
+        assert_eq!(info.get_memory_percentage(), Some(100));
+
+        let short = ListCollectionsResponse::from_proto(milvus::ShowCollectionsResponse {
+            collection_names: vec!["books".into(), "articles".into()],
+            collection_ids: vec![1, 2],
+            created_timestamps: vec![10, 20],
+            created_utc_timestamps: vec![100, 200],
+            in_memory_percentages: vec![100],
+            ..Default::default()
+        })
+        .expect_err("short in_memory_percentages must be rejected");
+        assert!(matches!(
+            short,
+            Error::MalformedResponse(message) if message.contains("in_memory_percentages has 1")
+        ));
     }
 }
 

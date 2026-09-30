@@ -2203,6 +2203,7 @@ pub struct CollectionInfo {
     pub(crate) created_utc_timestamp: u64,
     pub(crate) query_service_available: Option<bool>,
     pub(crate) shard_count: Option<i32>,
+    pub(crate) memory_percentage: Option<i64>,
 }
 
 impl CollectionInfo {
@@ -2215,6 +2216,7 @@ impl CollectionInfo {
             created_utc_timestamp: 0,
             query_service_available: None,
             shard_count: None,
+            memory_percentage: None,
         }
     }
 
@@ -2318,6 +2320,25 @@ impl CollectionInfo {
     /// Returns the shard count, or `None` when an older server omitted this metadata.
     pub fn get_shard_count(&self) -> Option<i32> {
         self.shard_count
+    }
+
+    /// Sets the in-memory load percentage and returns the updated value.
+    ///
+    /// Reported by the server when the collection is loaded (`ShowType::InMemory`).
+    pub fn memory_percentage(mut self, value: i64) -> Self {
+        self.memory_percentage = Some(value);
+        self
+    }
+
+    /// Sets the in-memory load percentage and returns this value for further mutation.
+    pub fn set_memory_percentage(&mut self, value: i64) -> &mut Self {
+        self.memory_percentage = Some(value);
+        self
+    }
+
+    /// Returns the in-memory load percentage, or `None` when the server omitted it.
+    pub fn get_memory_percentage(&self) -> Option<i64> {
+        self.memory_percentage
     }
 }
 
@@ -3062,6 +3083,30 @@ mod constructor_value_tests {
 
         let malformed = FieldSchema::new().type_param("analyzer_params", "not-json");
         assert!(malformed.get_analyzer_params().is_err());
+    }
+
+    #[test]
+    fn text_field_schema_validates_and_round_trips_proto() {
+        let analyzer = serde_json::json!({"tokenizer": "standard"});
+        let field = FieldSchema::new()
+            .name("body")
+            .data_type(DataType::Text)
+            .enable_analyzer(true)
+            .analyzer_params(analyzer.clone());
+        field
+            .validate()
+            .expect("text field must validate without max_length");
+        assert!(field.is_analyzer_enabled());
+        assert_eq!(field.get_analyzer_params().unwrap(), analyzer);
+        assert_eq!(field.get_data_type(), DataType::Text);
+
+        let proto = field.into_proto();
+        assert_eq!(proto.data_type, schema::DataType::Text as i32);
+
+        let decoded = FieldSchema::from_proto(proto).unwrap();
+        assert_eq!(decoded.get_data_type(), DataType::Text);
+        assert!(decoded.is_analyzer_enabled());
+        assert_eq!(decoded.get_analyzer_params().unwrap(), analyzer);
     }
 
     #[test]
