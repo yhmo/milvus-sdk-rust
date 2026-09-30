@@ -17,6 +17,7 @@
 use super::common::MockServer;
 use milvus::v2::error::Error;
 use milvus::v2::request::dql::*;
+use milvus::v2::types::{Function, FunctionType};
 use milvus::v2::SearchVectors;
 
 #[tokio::test]
@@ -61,6 +62,11 @@ async fn session_routes_dql_requests_to_the_target_cluster() {
                     .vectors(SearchVectors::Float(vec![vec![0.1, 0.2]]))
                     .build()
                     .expect("valid request")])
+                .rerank(
+                    Function::new()
+                        .name("rrf")
+                        .function_type(FunctionType::Rerank),
+                )
                 .build()
                 .expect("valid request"),
         )

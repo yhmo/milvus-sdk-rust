@@ -616,6 +616,11 @@ async fn missing_primary_field_name_does_not_load_the_schema_cache() {
                     .build()
                     .expect("valid request")])
                 .consistency_level(ConsistencyLevel::Strong)
+                .rerank(
+                    Function::new()
+                        .name("rrf")
+                        .function_type(FunctionType::Rerank),
+                )
                 .build()
                 .expect("valid request"),
         )

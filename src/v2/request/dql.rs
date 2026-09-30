@@ -1859,6 +1859,7 @@ impl HybridSearchRequestBuilder {
     /// - `offset` must not be negative
     /// - `group_size` must be greater than zero
     /// - `round_decimal`: must be within -1..=6
+    /// - either `rerank` or at least one `function_chains` must be configured
     /// - `function_chains` cannot be combined with `rerank` and each chain must validate
     /// - the configured values fail `validate_search_extra_params` validation
     pub fn build(self) -> Result<HybridSearchRequest> {
@@ -1879,6 +1880,12 @@ impl HybridSearchRequestBuilder {
             return Err(Error::validation(
                 "function_chains".into(),
                 "cannot be used together with rerank".into(),
+            ));
+        }
+        if self.value.function_chains.is_empty() && self.value.rerank.is_none() {
+            return Err(Error::validation(
+                "rerank".into(),
+                "rerank function or function chains is undefined".into(),
             ));
         }
         for chain in &self.value.function_chains {
@@ -2454,7 +2461,7 @@ mod search_request_tests {
     use crate::v2::types::{
         col, fn_, AggDirection, BoostRerank, DecayRerank, FunctionChain, FunctionChainStage,
         FunctionScore, HighlightType, Ids, MetricOp, MetricSpec, MetricType, ModelRerank,
-        OrderSpec, SearchAggregation, SparseVector, WeightedRerank,
+        OrderSpec, RRFRerank, SearchAggregation, SparseVector, WeightedRerank,
     };
     use prost::Message;
     use serde_json::json;
@@ -2779,6 +2786,7 @@ mod search_request_tests {
             HybridSearchRequest::builder()
                 .collection_name("books")
                 .sub_requests(vec![SubSearchRequest::empty()])
+                .rerank(RRFRerank::new())
                 .round_decimal(round_decimal)
                 .build()
                 .unwrap_or_else(|error| {
@@ -3147,7 +3155,7 @@ mod query_request_tests {
         QueryRequest, SearchRequest, SearchVectors, SubSearchRequest,
     };
     use crate::proto::schema::{template_array_value, template_value};
-    use crate::v2::types::AggDirection;
+    use crate::v2::types::{AggDirection, RRFRerank};
     use std::collections::HashMap;
 
     #[test]
@@ -3340,6 +3348,7 @@ mod query_request_tests {
                 .vectors(SearchVectors::Float(vec![vec![0.1, 0.2]]))
                 .build()
                 .expect("valid request")])
+            .rerank(RRFRerank::new())
             .build()
             .expect("valid request")
             .into_proto("default", 1)
@@ -3931,6 +3940,27 @@ mod builder_value_tests {
             conflicting,
             crate::v2::error::Error::Validation(error)
                 if error.parameter() == "function_chains"
+        ));
+    }
+
+    #[test]
+    fn hybrid_search_requires_rerank_or_function_chains() {
+        let sub_request = SubSearchRequest::builder()
+            .vector_field("embedding")
+            .vectors(SearchVectors::Float(vec![vec![0.1, 0.2]]))
+            .limit(3)
+            .build()
+            .expect("valid sub-request");
+
+        let missing = HybridSearchRequest::builder()
+            .collection_name("books")
+            .sub_requests(vec![sub_request])
+            .build()
+            .expect_err("hybrid search without rerank or function chains is undefined");
+        assert!(matches!(
+            missing,
+            crate::v2::error::Error::Validation(error)
+                if error.parameter() == "rerank"
         ));
     }
 
