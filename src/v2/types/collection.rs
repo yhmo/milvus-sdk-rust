@@ -2203,7 +2203,6 @@ pub struct CollectionInfo {
     pub(crate) created_utc_timestamp: u64,
     pub(crate) query_service_available: Option<bool>,
     pub(crate) shard_count: Option<i32>,
-    pub(crate) memory_percentage: Option<i64>,
 }
 
 impl CollectionInfo {
@@ -2216,7 +2215,6 @@ impl CollectionInfo {
             created_utc_timestamp: 0,
             query_service_available: None,
             shard_count: None,
-            memory_percentage: None,
         }
     }
 
@@ -2320,25 +2318,6 @@ impl CollectionInfo {
     /// Returns the shard count, or `None` when an older server omitted this metadata.
     pub fn get_shard_count(&self) -> Option<i32> {
         self.shard_count
-    }
-
-    /// Sets the in-memory load percentage and returns the updated value.
-    ///
-    /// Reported by the server when the collection is loaded (`ShowType::InMemory`).
-    pub fn memory_percentage(mut self, value: i64) -> Self {
-        self.memory_percentage = Some(value);
-        self
-    }
-
-    /// Sets the in-memory load percentage and returns this value for further mutation.
-    pub fn set_memory_percentage(&mut self, value: i64) -> &mut Self {
-        self.memory_percentage = Some(value);
-        self
-    }
-
-    /// Returns the in-memory load percentage, or `None` when the server omitted it.
-    pub fn get_memory_percentage(&self) -> Option<i64> {
-        self.memory_percentage
     }
 }
 
